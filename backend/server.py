@@ -103,23 +103,42 @@ async def send_message(conversation_id: str, input: MessageCreate):
     
     async def generate_response():
         try:
-            api_key = os.environ.get('EMERGENT_LLM_KEY')
+            api_key = os.environ.get('GEMINI_API_KEY')
             if not api_key:
                 raise HTTPException(status_code=500, detail="API key not configured")
             
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=conversation_id,
-                system_message="You are a helpful AI assistant. Provide clear, accurate, and friendly responses."
-            ).with_model("gemini", "gemini-3-flash-preview")
+            client = genai.Client(api_key=api_key)
             
-            user_message = UserMessage(text=input.content)
-            response = await chat.send_message(user_message)
+            messages = await db.messages.find(
+                {"conversation_id": conversation_id}, 
+                {"_id": 0}
+            ).sort("timestamp", 1).to_list(1000)
+            
+            history = []
+            for msg in messages[:-1]:
+                history.append({
+                    "role": "user" if msg["role"] == "user" else "model",
+                    "parts": [{"text": msg["content"]}]
+                })
+            
+            response = client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=history + [{
+                    "role": "user",
+                    "parts": [{"text": input.content}]
+                }],
+                config={
+                    "system_instruction": "You are a helpful AI assistant. Provide clear, accurate, and friendly responses.",
+                    "temperature": 0.7,
+                }
+            )
+            
+            ai_content = response.text
             
             ai_msg = Message(
                 conversation_id=conversation_id,
                 role="assistant",
-                content=response
+                content=ai_content
             )
             ai_doc = ai_msg.model_dump()
             ai_doc['timestamp'] = ai_doc['timestamp'].isoformat()
