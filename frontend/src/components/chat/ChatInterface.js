@@ -163,7 +163,7 @@ export const ChatInterface = ({
               E1 Assistant
             </h2>
             <p className="text-xs text-[#71717A] dark:text-[#A1A1AA]">
-              Powered by Gemini 3
+              Powered by Gemini 2.0 Flash
             </p>
           </div>
         </div>
